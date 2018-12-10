@@ -150,9 +150,16 @@ QStringList processCommandLineArguments(const QCoreApplication &app)
                                    QStringLiteral("1.0"));
     parser.addOption(hardwareMultiplierOption);
 
+    QCommandLineOption customArgumentsOption(QStringLiteral("custom-arguments"),
+                                             QStringLiteral("Custom arguments to pass to the benchmarks"),
+                                             QStringLiteral("args"));
+    parser.addOption(customArgumentsOption);
+
     parser.addPositionalArgument(QStringLiteral("input"),
                                  QStringLiteral("One or more QML files or a directory of QML files to benchmark"));
     const QCommandLineOption &helpOption = parser.addHelpOption();
+
+    parser.setOptionsAfterPositionalArgumentsMode(QCommandLineParser::ParseAsPositionalArguments);
 
     parser.process(app);
 
@@ -179,6 +186,7 @@ QStringList processCommandLineArguments(const QCoreApplication &app)
     Options::instance.frameCountInterval = parser.value(frameCountInterval).toInt();
     Options::instance.destroyViewEachRun = parser.isSet(destroyViewOption);
     Options::instance.timeout = parser.value(timeoutOption).toInt();
+    Options::instance.arguments = parser.value(customArgumentsOption);
 
     QSize size(parser.value(widthOption).toInt(),
                parser.value(heightOption).toInt());
@@ -202,6 +210,10 @@ QStringList processCommandLineArguments(const QCoreApplication &app)
     }
 
     foreach (QString input, parser.positionalArguments()) {
+        // Skip any custom arguments passed as positional
+        if (input.startsWith('-')) {
+            continue;
+        }
         QFileInfo info(input);
         if (!info.exists()) {
             qWarning() << "input doesn't exist:" << input;
@@ -294,6 +306,7 @@ int runHostProcess(const QCoreApplication &app, const QStringList &positionalArg
     for (const Benchmark &b : Options::instance.benchmarks) {
         QStringList sanitizedArgCopy = sanitizedArgs;
         sanitizedArgCopy.append(b.fileName);
+        sanitizedArgCopy.append(Options::instance.arguments);
 
         QProcess *p = new QProcess;
         QByteArray stdErrBuf;
